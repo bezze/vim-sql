@@ -1,7 +1,10 @@
 let s:SQLBIN = trim(system("which mysql"))
+let s:PYTHON = trim(system("which python3"))
+let s:plugin_path = stdpath('data') . "/plugged/vim-sql"
 let s:db_alias_file = stdpath('config') . "/vim-sql/db_alias"
+let s:python_parser = s:plugin_path . "/parse.py"
 let s:result_buf = '__query_results__'
-let s:KEYWORDS = ['SELECT', 'FROM', 'INTO', 'TABLE', 'ON', 'AS', 'DELETE', 'CREATE', 'WHERE', 'IN', 'GROUP', 'BY', 'ORDER']
+let s:KEYWORDS = ['SELECT', 'FROM', 'INTO', 'TABLE', 'ON', 'AS', 'DELETE', 'CREATE', 'WHERE', 'IN', 'GROUP', 'BY', 'ORDER', 'INSERT', 'JOIN', 'LIMIT']
 let s:INDENT_KEYWORDS = ['SELECT', 'FROM', 'CREATE', 'WHERE', 'DELETE', 'GROUP', 'BY', 'ORDER']
 
 function! s:Alias(alias)
@@ -71,7 +74,28 @@ function! s:format_mysql(l1, l2)
     endfor
 endfunction
 
-function! s:Mysql(l1, l2, ...)
+function! s:mysql(l1, l2, data)
+
+    call s:close_buffer(s:result_buf)
+
+    let script = join(getline(a:l1, a:l2), "\n")
+
+    let call = join([s:SQLBIN,
+                \ "--user=" . a:data["user"],
+                \ "--password=" . a:data["pass"],
+                \ "--port=" . a:data["port"],
+                \ "--host=" . a:data["db_url"],
+                \ "--column-names", "--batch",
+                \ '--execute="' . script . '"',
+                \ a:data["schema"],
+                \ ], " ")
+
+    let results = systemlist(call)
+    return results
+endfunction
+
+
+function! s:Mysql(l1, l2, pretty, ...)
 
     let alias = s:detect_alias()
     if alias > -1
@@ -82,35 +106,29 @@ function! s:Mysql(l1, l2, ...)
         return
     endif
 
-    call s:close_buffer(s:result_buf)
+    let results = s:mysql(a:l1, a:l2, data)[1:]
 
-    let script = join(getline(a:l1, a:l2), "\n")
+    if a:pretty == 1
+        let call = 'echo "' . join(results, "\n") . '" | ' . s:PYTHON . " " . s:python_parser
+        let results = systemlist(call)
+    endif
 
-    let call = join([s:SQLBIN,
-                \ "--user=" . data["user"],
-                \ "--password=" . data["pass"],
-                \ "--port=" . data["port"],
-                \ "--host=" . data["db_url"],
-                \ "--column-names", "--batch",
-                \ '--execute="' . script . '"',
-                \ data["schema"],
-                \ ], " ")
-
-    let results = systemlist(call)
     if len(results) > 0
-        exec "botright 7split " . s:result_buf
+        exec "botright 7split " . s:result_buf . expand('%:p:t')
         setlocal buftype=nofile
         normal! ggdG
         " Insert the bytecode.
         call append(0, results)
-        normal! gg"Zdd
+        normal! gg
     endif
 
 endfunction
+
 
 function! EditAlias()
     exec "top split " . s:db_alias_file
 endfunction
 
-command! -range=% -nargs=? Mysql call s:Mysql(<line1>, <line2>, <q-args>)
+command! -range=% -nargs=? Mysql call s:Mysql(<line1>, <line2>, 0, <q-args>)
+command! -range=% -nargs=? MysqlPretty call s:Mysql(<line1>, <line2>, 1, <q-args>)
 command! -range=% FormatSQL call s:format_mysql(<line1>, <line2>)
