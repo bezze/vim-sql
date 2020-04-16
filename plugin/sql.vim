@@ -94,26 +94,49 @@ function! s:mysql(l1, l2, data)
     return results
 endfunction
 
+function! s:mysql_dummy(l1, l2, data)
+    return ["1", "2", "3"]
+endfunction
+
+function! s:parse_args(arg_list)
+    let arg_map = {}
+    let arg_count = 0
+    while arg_count < len(a:arg_list)
+        let arg_key = a:arg_list[arg_count]
+        let arg_val = a:arg_list[arg_count+1]
+        let arg_map[arg_key] = arg_val
+        let arg_count += 2
+    endwhile
+    return arg_map
+endfunction
 
 function! s:Mysql(l1, l2, pretty, ...)
 
-    let alias = s:detect_alias()
-    if alias > -1
-        let data = s:Alias(alias)
-    elseif a:0 > 0
-        let data = s:Alias(a:1)
+    let args = s:parse_args(a:000)
+
+    if has_key(args, "-a")
+        let alias = args["-a"]
     else
-        return
+        let alias = s:detect_alias()
     endif
 
+    let data = s:Alias(alias)
+
     let results = s:mysql(a:l1, a:l2, data)[1:]
+    " let results = s:mysql_dummy(a:l1, a:l2, data)[1:]
 
     if a:pretty == 1
         let call = 'echo "' . join(results, "\n") . '" | ' . s:PYTHON . " " . s:python_parser
         let results = systemlist(call)
     endif
 
-    if len(results) > 0
+    if len(results) == 0
+        return
+    endif
+
+    if has_key(args, "-o")
+        call writefile(results, args['-o'])
+    else
         exec "botright 7split " . s:result_buf . expand('%:p:t')
         setlocal buftype=nofile
         normal! ggdG
@@ -129,6 +152,6 @@ function! EditAlias()
     exec "top split " . s:db_alias_file
 endfunction
 
-command! -range=% -nargs=? Mysql call s:Mysql(<line1>, <line2>, 0, <q-args>)
-command! -range=% -nargs=? MysqlPretty call s:Mysql(<line1>, <line2>, 1, <q-args>)
-command! -range=% FormatSQL call s:format_mysql(<line1>, <line2>)
+command! -range=% -nargs=* Mysql call s:Mysql(<line1>, <line2>, 0, <f-args>)
+command! -range=% -nargs=* MysqlPretty call s:Mysql(<line1>, <line2>, 1, <f-args>)
+command! -range=% MysqlFormat call s:format_mysql(<line1>, <line2>)
