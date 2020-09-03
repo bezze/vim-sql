@@ -4,7 +4,7 @@ let s:plugin_path = stdpath('data') . "/plugged/vim-sql"
 let s:db_alias_file = stdpath('config') . "/vim-sql/db_alias"
 let s:python_parser = s:plugin_path . "/parse.py"
 let s:result_buf = '__query_results__'
-let s:KEYWORDS = ['SELECT', 'FROM', 'INTO', 'TABLE', 'ON', 'AS', 'DELETE', 'CREATE', 'WHERE', 'IN', 'GROUP', 'BY', 'ORDER', 'INSERT', 'JOIN', 'LIMIT']
+let s:KEYWORDS = ['SELECT', 'FROM', 'INTO', 'TABLE', 'ON', 'AS', 'DELETE', 'CREATE', 'WHERE', 'IN', 'GROUP', 'BY', 'ORDER', 'INSERT', 'JOIN', 'LIMIT', 'WHEN', 'CASE', 'ELSE', 'THEN', 'END']
 let s:INDENT_KEYWORDS = ['SELECT', 'FROM', 'CREATE', 'WHERE', 'DELETE', 'GROUP', 'BY', 'ORDER']
 
 function! s:Alias(alias)
@@ -67,18 +67,34 @@ function! s:format_lines(l1, l2)
     return lines
 endfunction
 
-function! s:format_mysql(l1, l2)
+function! mysql#format(l1, l2)
     let formatted_text = s:format_lines(a:l1, a:l2)
     for l in range(a:l1, a:l2)
         call setline(l, formatted_text[l-a:l1])
     endfor
 endfunction
 
+function! s:query(data, query)
+    let call = join([s:SQLBIN,
+                \ "--user=" . a:data["user"],
+                \ "--password=" . a:data["pass"],
+                \ "--port=" . a:data["port"],
+                \ "--host=" . a:data["db_url"],
+                \ "--column-names", "--batch",
+                \ '--execute="' . a:query . '"',
+                \ a:data["schema"],
+                \ ], " ")
+    let results = systemlist(call)
+    return results
+endfunction
+
 function! s:mysql(l1, l2, data)
 
     call s:close_buffer(s:result_buf)
 
-    let script = join(getline(a:l1, a:l2), "\n")
+    " let script = shellescape(join(getline(a:l1, a:l2), "\n"), 1)
+    let script = substitute(join(getline(a:l1, a:l2), "\n"), "`", "\`" , "g")
+    " echo script
 
     let call = join([s:SQLBIN,
                 \ "--user=" . a:data["user"],
@@ -110,7 +126,7 @@ function! s:parse_args(arg_list)
     return arg_map
 endfunction
 
-function! s:Mysql(l1, l2, pretty, ...)
+function! mysql#Query(l1, l2, pretty, ...)
 
     let args = s:parse_args(a:000)
 
@@ -148,10 +164,37 @@ function! s:Mysql(l1, l2, pretty, ...)
 endfunction
 
 
-function! EditAlias()
+function! MysqlAlias()
     exec "top split " . s:db_alias_file
 endfunction
 
-command! -range=% -nargs=* Mysql call s:Mysql(<line1>, <line2>, 0, <f-args>)
-command! -range=% -nargs=* MysqlPretty call s:Mysql(<line1>, <line2>, 1, <f-args>)
-command! -range=% MysqlFormat call s:format_mysql(<line1>, <line2>)
+function! mysql#tables()
+    let alias = s:detect_alias()
+    let data = s:Alias(alias)
+    let tables = s:query(data, "show tables;")
+    exec "vertical topleft 30split " . data["schema"] . "_tables"
+    setlocal buftype=nofile
+    normal! ggdG
+    " Insert the bytecode.
+    call append(0, tables)
+    normal! gg
+endfunction
+
+
+function! s:describe(table)
+    let alias = s:detect_alias()
+    let data = s:Alias(alias)
+    let tables = s:query(data, "describe " . a:table . ";")
+    exec "vertical topleft 30split " . a:table
+    setlocal buftype=nofile
+    normal! ggdG
+    " Insert the bytecode.
+    call append(0, tables)
+    normal! gg
+endfunction
+
+function! mysql#describe()
+    let table = expand("<cword>")
+    call s:describe(table)
+endfunction
+
