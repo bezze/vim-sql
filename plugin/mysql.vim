@@ -3,5 +3,5 @@ command! -range=% -nargs=* MysqlPretty call mysql#Query(<line1>, <line2>, 1, <f-
 command! -range=% MysqlFormat call mysql#format(<line1>, <line2>)
 
 noremap ;r :Mysql<CR>
-noremap <F2> :call mysql#tables()<CR>
+noremap ;t :call mysql#tables()<CR>
 noremap ;d :call mysql#describe()<CR>
