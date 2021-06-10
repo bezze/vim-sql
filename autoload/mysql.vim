@@ -7,7 +7,32 @@ let s:result_buf = '__query_results__'
 let s:KEYWORDS = ['SELECT', 'FROM', 'INTO', 'TABLE', 'ON', 'AS', 'DELETE', 'CREATE', 'WHERE', 'IN', 'GROUP', 'BY', 'ORDER', 'INSERT', 'JOIN', 'LIMIT', 'WHEN', 'CASE', 'ELSE', 'THEN', 'END']
 let s:INDENT_KEYWORDS = ['SELECT', 'FROM', 'CREATE', 'WHERE', 'DELETE', 'GROUP', 'BY', 'ORDER']
 
-function! s:Alias(alias)
+function! s:find_alias_file()
+    let alias_file = expand('%:p:h') . "/.vim-sql.conf"
+    return alias_file
+endfunction
+
+function! s:Alias2()
+    let param_list = readfile(s:find_alias_file())
+    let config = {}
+    try
+        for a in param_list
+            let key_value = split(a, "=")
+            let key = trim(key_value[0])
+            let value = trim(key_value[1])
+            let config[key] = value
+        endfor
+        return config
+    catch
+        return -1
+    endtry
+endfunction
+
+function! Test()
+    return s:Alias2()
+endfunction
+
+function! s:Alias()
     let alias_list = readfile(s:db_alias_file)
     for a in alias_list
         let alias_data = split(a, ",")
@@ -136,7 +161,7 @@ function! mysql#Query(l1, l2, pretty, ...)
         let alias = s:detect_alias()
     endif
 
-    let data = s:Alias(alias)
+    let data = s:Alias2()
 
     let results = s:mysql(a:l1, a:l2, data)[1:]
     " let results = s:mysql_dummy(a:l1, a:l2, data)[1:]
@@ -170,7 +195,7 @@ endfunction
 
 function! mysql#tables()
     let alias = s:detect_alias()
-    let data = s:Alias(alias)
+    let data = s:Alias2()
     let tables = s:query(data, "show tables;")
     exec "vertical topleft 30split " . data["schema"] . "_tables"
     setlocal buftype=nofile
@@ -183,7 +208,7 @@ endfunction
 
 function! s:describe(table)
     let alias = s:detect_alias()
-    let data = s:Alias(alias)
+    let data = s:Alias2()
     let tables = s:query(data, "describe " . a:table . ";")
     exec "vertical topleft 30split " . a:table
     setlocal buftype=nofile
@@ -200,7 +225,7 @@ endfunction
 
 function! mysql#open_shell()
     let alias = s:detect_alias()
-    let data = s:Alias(alias)
+    let data = s:Alias2()
     let shelllog = join([s:SQLBIN,
                 \ "--user=" . data["user"],
                 \ "--password=" . data["pass"],
