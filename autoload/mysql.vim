@@ -164,7 +164,7 @@ function! mysql#Query(l1, l2, pretty, ...)
 endfunction
 
 
-function! MysqlAlias()
+function! mysql#edalias()
     exec "top split " . s:db_alias_file
 endfunction
 
@@ -198,3 +198,16 @@ function! mysql#describe()
     call s:describe(table)
 endfunction
 
+function! mysql#open_shell()
+    let alias = s:detect_alias()
+    let data = s:Alias(alias)
+    let shelllog = join([s:SQLBIN,
+                \ "--user=" . data["user"],
+                \ "--password=" . data["pass"],
+                \ "--port=" . data["port"],
+                \ "--host=" . data["db_url"],
+                \ data["schema"],
+                \ ], " ")
+    execute "7split"
+    execute "terminal " . shelllog
+endfunction
